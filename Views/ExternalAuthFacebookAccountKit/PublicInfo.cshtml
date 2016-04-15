@@ -1,6 +1,8 @@
 ﻿@using Nop.Web.Framework.UI
 @{
     Layout = "";
+    var url = this.Context.Request.QueryString["returnUrl"];
+    var m =10;
 }
 
 <div class="facebook-accountkit-login-block">
@@ -26,13 +28,13 @@
     </div>
 
     <input type="button" class="button-1" onclick="email_btn_onclick();" value="Login via Email"/>
-   @using (Html.BeginForm("PublicInfo", "ExternalAuthFacebookAccountKit", FormMethod.Post,new { id = "account_kit_form" })){
+   @using (Html.BeginForm("PublicInfo", "ExternalAuthFacebookAccountKit",new {returnUrl= url }, FormMethod.Post,new { id = "account_kit_form" })){
        <input type = "hidden" value = "" id = "csrf_nonce"  name = "csrf_nonce" />
        <input type = "hidden" value = "" id = "Code" name="Code" />
                 }
-    <form id="account_kit_form" action="">
+    @*<form id="account_kit_form" action="">
        
-    </form>
+    </form>*@
 </div>
 <script src="https://sdk.accountkit.com/en_US/sdk.js"></script>
 

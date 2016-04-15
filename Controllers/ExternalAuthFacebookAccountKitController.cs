@@ -11,6 +11,7 @@ using Newtonsoft.Json.Linq;
 using Nop.Core;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Plugins;
+using Nop.Plugin.ExternalAuth.FacebookAccountKit.Core;
 using Nop.Plugin.ExternalAuth.FacebookAccountKit.Models;
 using Nop.Services.Authentication.External;
 using Nop.Services.Configuration;
@@ -30,7 +31,7 @@ namespace Nop.Plugin.ExternalAuth.FacebookAccountKit.Controllers
     public class ExternalAuthFacebookAccountKitController: BasePluginController
     {
         #region fields
-
+        private readonly IExternalAuthorizer _authorizer;
         private readonly ISettingService _settingService;
         private readonly IOpenAuthenticationService _openAuthenticationService;
         private readonly ExternalAuthenticationSettings _externalAuthenticationSettings;
@@ -47,7 +48,7 @@ namespace Nop.Plugin.ExternalAuth.FacebookAccountKit.Controllers
             IOpenAuthenticationService openAuthenticationService,
             ExternalAuthenticationSettings externalAuthenticationSettings, IPermissionService permissionService,
             IStoreContext storeContext, IStoreService storeService, IWorkContext workContext, IPluginFinder pluginFinder,
-            ILocalizationService localizationService)
+            ILocalizationService localizationService, IExternalAuthorizer authorizer)
         {
             _settingService = settingService;
             _openAuthenticationService = openAuthenticationService;
@@ -58,6 +59,7 @@ namespace Nop.Plugin.ExternalAuth.FacebookAccountKit.Controllers
             _workContext = workContext;
             _pluginFinder = pluginFinder;
             _localizationService = localizationService;
+            _authorizer = authorizer;
         }
 
         #endregion
@@ -137,7 +139,7 @@ namespace Nop.Plugin.ExternalAuth.FacebookAccountKit.Controllers
         }
         [HttpPost]
      
-        public ActionResult PublicInfo(PublicInfoModel model)
+        public ActionResult PublicInfo(PublicInfoModel model,string returnUrl)
         {
             string cookieToken = "";
             string formToken = "";
@@ -177,54 +179,111 @@ namespace Nop.Plugin.ExternalAuth.FacebookAccountKit.Controllers
                 var responseObj = JsonConvert.DeserializeObject<JObject>(response.Content);
                 if (responseObj["access_token"] != null)
                 {
-                    var accesss_token = responseObj["access_token"].ToString();
+                    var accesssToken = responseObj["access_token"].ToString();
 
-                    var me_request = new RestRequest("me", Method.GET);
-                    me_request.AddParameter("access_token", accesss_token, ParameterType.QueryString);
-                    var response2 = _client.Execute(me_request);
+                    var meRequest = new RestRequest("me", Method.GET);
+                    meRequest.AddParameter("access_token", accesssToken, ParameterType.QueryString);
+                    var response2 = _client.Execute(meRequest);
 
                     var responseObj2 = JsonConvert.DeserializeObject<JObject>(response2.Content);
+                    var email = "";
                     if (responseObj2["phone"]!=null)
                     {
-                        var phone_num = responseObj2["phone"]["number"];
+                        //login via phone Number
+                        var phoneNum = responseObj2["phone"]["number"].ToString();
+                        email = phoneNum += "@xxx.com";
+
                     }
                     else if (responseObj2["email"]!=null)
                     {
-                        var email_addr = responseObj2["email"]["address"];
+                        //login via email Address
+                        email = responseObj2["email"]["address"].ToString();
                     }
+                     
+                    var processor = _openAuthenticationService.LoadExternalAuthenticationMethodBySystemName("ExternalAuth.FacebookAccountKit");
+                    if (processor == null ||
+                        !processor.IsMethodActive(_externalAuthenticationSettings) ||
+                        !processor.PluginDescriptor.Installed ||
+                        !_pluginFinder.AuthenticateStore(processor.PluginDescriptor, _storeContext.CurrentStore.Id))
+                        throw new NopException("Facebook module cannot be loaded");
+
+                    var parameters = new FacebookAuthenticationParameters(Provider.SystemName)
+                    {
+
+                        ExternalIdentifier = responseObj2["id"].ToString(),
+                        OAuthToken = accesssToken,
+                        OAuthAccessToken = responseObj2["id"].ToString(),
+                        
+                    };
+                    //add to claim of parameter
+                    var claims = new UserClaims
+                    {
+                        Contact = new ContactClaims()
+                        {
+                            Email = email
+                        }
+                    };
+                    parameters.AddClaim(claims);
+
+
+                    var result = _authorizer.Authorize(parameters);
+                    //if (result.Status == OpenAuthenticationStatus.AutoRegisteredStandard)
+                    //{
+                    //    //cheat here
+                    //    result = new AuthorizationResult(OpenAuthenticationStatus.Authenticated);
+                    //}
+                    var res= new AuthorizeState(returnUrl, result);
+                    switch (res.AuthenticationStatus)
+                    {
+                        case OpenAuthenticationStatus.Error:
+                            {
+                                if (!result.Success)
+                                    foreach (var error in result.Errors)
+                                        ExternalAuthorizerHelper.AddErrorsToDisplay(error);
+
+                                return new RedirectResult(Url.LogOn(returnUrl));
+                            }
+                        case OpenAuthenticationStatus.AssociateOnLogon:
+                            {
+                                return new RedirectResult(Url.LogOn(returnUrl));
+                            }
+                        case OpenAuthenticationStatus.AutoRegisteredEmailValidation:
+                            {
+                                //result
+                                return RedirectToRoute("RegisterResult", new { resultId = (int)UserRegistrationType.EmailValidation });
+                            }
+                        case OpenAuthenticationStatus.AutoRegisteredAdminApproval:
+                            {
+                                return RedirectToRoute("RegisterResult", new { resultId = (int)UserRegistrationType.AdminApproval });
+                            }
+                        case OpenAuthenticationStatus.AutoRegisteredStandard:
+                            {
+                                return RedirectToRoute("RegisterResult", new { resultId = (int)UserRegistrationType.Standard });
+                            }
+                        default:
+                            break;
+                    }
+                    if (res.Result != null)
+                        return res.Result;
                 }
-
-                //// get account details at /me endpoint
-                //var me_endpoint_url = me_endpoint_base_url + '?access_token=' + respBody.access_token;
-                //Request.get({ url: me_endpoint_url, json: true }, function(err, resp, respBody) {
-                //    // send login_success.html
-                //    if (respBody.phone)
-                //    {
-                //        view.phone_num = respBody.phone.number;
-                //    }
-                //    else if (respBody.email)
-                //    {
-                //        view.email_addr = respBody.email.address;
-                //    }
-                //    var html = Mustache.to_html(loadLoginSuccess(), view);
-                //    response.send(html);
-                //});
-
             }
             catch (Exception ex)
             {
                 Trace.TraceError("error:" + ex.InnerException);
                
             }
+            var isAuthenticated = HttpContext.Request.IsAuthenticated;
 
-            return View("~/Plugins/ExternalAuthAccountKit.Facebook/Views/ExternalAuthFacebookAccountKit/PublicInfo.cshtml");
+           
+            // var returnUrl = HttpContext.Request.QueryString["returnUrl"];
+            return HttpContext.Request.IsAuthenticated 
+                ? new RedirectResult(!string.IsNullOrEmpty(returnUrl) ? returnUrl : "~/") 
+                : new RedirectResult(Url.LogOn(returnUrl));
+
+            //return View("~/Plugins/ExternalAuthAccountKit.Facebook/Views/ExternalAuthFacebookAccountKit/PublicInfo.cshtml");
 
 
         }
 
-        public ActionResult Login(string returnUrl)
-        {
-            return View("");
-        }
     }
 }
