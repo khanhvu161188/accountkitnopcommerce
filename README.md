@@ -1,2 +1,2 @@
 # Nopcommerce plugin for Facebook Account Kit
-Integrate Facebook account kit for Nopcommerce 
+Integrate Facebook Account Kit (https://developers.facebook.com/docs/accountkit) for Nopcommerce
