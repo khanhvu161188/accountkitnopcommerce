@@ -138,7 +138,7 @@ namespace Nop.Plugin.ExternalAuth.FacebookAccountKit.Core
                         if (customer != null)
                         {
                             // remove domain from username
-                            var phoneNumer = customer.Username.Replace("", "");
+                            var phoneNumer = customer.Username.Replace(domain, "");
                             customer.Username = phoneNumer;
                             _customerService.UpdateCustomer(customer);
                         }
