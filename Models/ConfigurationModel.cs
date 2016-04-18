@@ -7,10 +7,12 @@ namespace Nop.Plugin.ExternalAuth.FacebookAccountKit.Models
     {
         public int ActiveStoreScopeConfiguration { get; set; }
 
-        [NopResourceDisplayName("Plugins.ExternalAuth.Facebook.AppId")]
+        [NopResourceDisplayName("Plugins.ExternalAuth.FacebookAccountKit.AppId")]
         public long AppId { get; set; }
         public bool AppId_OverrideForStore { get; set; }
 
-        
+        [NopResourceDisplayName("Plugins.ExternalAuth.FacebookAccountKit.ClientSecret")]
+        public string AccountKitSecretToken { get; set; }
+        public bool AccountKitSecretToken_OverrideForStore { get; set; }
     }
 }

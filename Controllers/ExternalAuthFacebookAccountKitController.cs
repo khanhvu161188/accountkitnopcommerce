@@ -10,7 +10,6 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Nop.Core;
 using Nop.Core.Domain.Customers;
-using Nop.Core.Plugins;
 using Nop.Plugin.ExternalAuth.FacebookAccountKit.Core;
 using Nop.Plugin.ExternalAuth.FacebookAccountKit.Models;
 using Nop.Services.Authentication.External;
@@ -31,35 +30,27 @@ namespace Nop.Plugin.ExternalAuth.FacebookAccountKit.Controllers
     public class ExternalAuthFacebookAccountKitController: BasePluginController
     {
         #region fields
-        private readonly IExternalAuthorizer _authorizer;
+
         private readonly ISettingService _settingService;
-        private readonly IOpenAuthenticationService _openAuthenticationService;
-        private readonly ExternalAuthenticationSettings _externalAuthenticationSettings;
         private readonly IPermissionService _permissionService;
-        private readonly IStoreContext _storeContext;
         private readonly IStoreService _storeService;
         private readonly IWorkContext _workContext;
-        private readonly IPluginFinder _pluginFinder;
         private readonly ILocalizationService _localizationService;
+        private readonly FacebookAccountKitProvicerAuthorizer _externalProviderAuthorizer;
+        private readonly CustomerSettings _customerSettings;
 
         #region Ctor
 
-        public ExternalAuthFacebookAccountKitController(ISettingService settingService,
-            IOpenAuthenticationService openAuthenticationService,
-            ExternalAuthenticationSettings externalAuthenticationSettings, IPermissionService permissionService,
-            IStoreContext storeContext, IStoreService storeService, IWorkContext workContext, IPluginFinder pluginFinder,
-            ILocalizationService localizationService, IExternalAuthorizer authorizer)
+        public ExternalAuthFacebookAccountKitController(ISettingService settingService, IPermissionService permissionService, IStoreService storeService, IWorkContext workContext,
+            ILocalizationService localizationService, FacebookAccountKitProvicerAuthorizer externalProviderAuthorizer, CustomerSettings customerSettings)
         {
             _settingService = settingService;
-            _openAuthenticationService = openAuthenticationService;
-            _externalAuthenticationSettings = externalAuthenticationSettings;
             _permissionService = permissionService;
-            _storeContext = storeContext;
             _storeService = storeService;
             _workContext = workContext;
-            _pluginFinder = pluginFinder;
             _localizationService = localizationService;
-            _authorizer = authorizer;
+            _externalProviderAuthorizer = externalProviderAuthorizer;
+            _customerSettings = customerSettings;
         }
 
         #endregion
@@ -84,6 +75,7 @@ namespace Nop.Plugin.ExternalAuth.FacebookAccountKit.Controllers
             var model = new ConfigurationModel
             {
                 AppId = facebookExternalAuthSettings.FacebookAppId,
+                AccountKitSecretToken =  facebookExternalAuthSettings.AccountKitSecretToken,
                 ActiveStoreScopeConfiguration = storeScope
             };
 
@@ -112,7 +104,7 @@ namespace Nop.Plugin.ExternalAuth.FacebookAccountKit.Controllers
 
             //save settings
             facebookExternalAuthSettings.FacebookAppId = model.AppId;
-         
+            facebookExternalAuthSettings.AccountKitSecretToken = model.AccountKitSecretToken;
             /* We do not clear cache after each setting update.
              * This behavior can increase performance because cached settings will not be cleared 
              * and loaded from database after each update */
@@ -121,7 +113,11 @@ namespace Nop.Plugin.ExternalAuth.FacebookAccountKit.Controllers
             else if (storeScope > 0)
                 _settingService.DeleteSetting(facebookExternalAuthSettings, x => x.FacebookAppId, storeScope);
 
-           
+            if (model.AccountKitSecretToken_OverrideForStore || storeScope == 0)
+                _settingService.SaveSetting(facebookExternalAuthSettings, x => x.AccountKitSecretToken, storeScope, false);
+            else if (storeScope > 0)
+                _settingService.DeleteSetting(facebookExternalAuthSettings, x => x.AccountKitSecretToken, storeScope);
+
 
             //now clear settings cache
             _settingService.ClearCache();
@@ -131,20 +127,45 @@ namespace Nop.Plugin.ExternalAuth.FacebookAccountKit.Controllers
             return Configure();
         }
 
-
+        private string GenerateTokenHeaderValue()
+        {
+            string cookieToken, formToken;
+            AntiForgery.GetTokens(null, out cookieToken, out formToken);
+            return cookieToken + ":" + formToken;
+        }
         [ChildActionOnly]
         public ActionResult PublicInfo()
         {
-            return View("~/Plugins/ExternalAuthAccountKit.Facebook/Views/ExternalAuthFacebookAccountKit/PublicInfo.cshtml");
+            var storeScope = this.GetActiveStoreScopeConfiguration(_storeService, _workContext);
+            var facebookExternalAuthSettings = _settingService.LoadSetting<FacebookExternalAuthAccountKitSettings>(storeScope);
+
+
+            var model = new DisplayLoginModel
+            {
+                CsrfCode = GenerateTokenHeaderValue(),
+                Version = Provider.Version,
+                AppId = facebookExternalAuthSettings.FacebookAppId
+            };
+            if (!_customerSettings.UsernamesEnabled ||
+                _customerSettings.UserRegistrationType == UserRegistrationType.EmailValidation)
+            {
+                model.ShowPhoneNumber = false;
+            }
+            else
+            {
+                model.ShowPhoneNumber = true;
+            }
+            
+
+            return View("~/Plugins/ExternalAuthAccountKit.Facebook/Views/ExternalAuthFacebookAccountKit/PublicInfo.cshtml", model);
         }
         [HttpPost]
      
         public ActionResult PublicInfo(PublicInfoModel model,string returnUrl)
         {
-            string cookieToken = "";
-            string formToken = "";
-            
-            string[] tokens = model.csrf_nonce.Split(':');
+            var cookieToken = "";
+            var formToken = "";
+            var tokens = model.csrf_nonce.Split(':');
             if (tokens.Length == 2)
             {
                 cookieToken = tokens[0].Trim();
@@ -152,6 +173,7 @@ namespace Nop.Plugin.ExternalAuth.FacebookAccountKit.Controllers
             }
             try
             {
+                //validate csrf
                 AntiForgery.Validate(cookieToken, formToken);
             }
             catch (Exception ex)
@@ -159,130 +181,48 @@ namespace Nop.Plugin.ExternalAuth.FacebookAccountKit.Controllers
                 ExternalAuthorizerHelper.AddErrorsToDisplay("CSRF is not correct");
                 return new RedirectResult(Url.LogOn(""));
             }
+            var storeScope = this.GetActiveStoreScopeConfiguration(_storeService, _workContext);
+            var facebookExternalAuthSettings = _settingService.LoadSetting<FacebookExternalAuthAccountKitSettings>(storeScope);
 
-             RestClient _client = new RestClient("https://graph.accountkit.com/v1.0/");
+            var result = _externalProviderAuthorizer.Authorize(model.Code, returnUrl, facebookExternalAuthSettings.FacebookAppId.ToString(), facebookExternalAuthSettings.AccountKitSecretToken);
 
-            //create request
-            var request = new RestRequest("access_token", Method.GET);
-
-            var accessToken = string.Join("|",
-                new List<string> {"AA", "1690029441247631", "c54110f9c40ba130e42a151741f4379c"});
-
-            request.AddParameter("grant_type", "authorization_code", ParameterType.QueryString);
-            request.AddParameter("code", model.Code, ParameterType.QueryString);
-            request.AddParameter("access_token", accessToken, ParameterType.QueryString);
-            try
+            switch (result.AuthenticationStatus)
             {
-                //execute
-                var response = _client.Execute(request);
-
-                var responseObj = JsonConvert.DeserializeObject<JObject>(response.Content);
-                if (responseObj["access_token"] != null)
-                {
-                    var accesssToken = responseObj["access_token"].ToString();
-
-                    var meRequest = new RestRequest("me", Method.GET);
-                    meRequest.AddParameter("access_token", accesssToken, ParameterType.QueryString);
-                    var response2 = _client.Execute(meRequest);
-
-                    var responseObj2 = JsonConvert.DeserializeObject<JObject>(response2.Content);
-                    var email = "";
-                    if (responseObj2["phone"]!=null)
+                case OpenAuthenticationStatus.Error:
                     {
-                        //login via phone Number
-                        var phoneNum = responseObj2["phone"]["number"].ToString();
-                        email = phoneNum += "@xxx.com";
+                        if (!result.Success)
+                            foreach (var error in result.Errors)
+                                ExternalAuthorizerHelper.AddErrorsToDisplay(error);
 
+                        return new RedirectResult(Url.LogOn(returnUrl));
                     }
-                    else if (responseObj2["email"]!=null)
+                case OpenAuthenticationStatus.AssociateOnLogon:
                     {
-                        //login via email Address
-                        email = responseObj2["email"]["address"].ToString();
+                        return new RedirectResult(Url.LogOn(returnUrl));
                     }
-                     
-                    var processor = _openAuthenticationService.LoadExternalAuthenticationMethodBySystemName("ExternalAuth.FacebookAccountKit");
-                    if (processor == null ||
-                        !processor.IsMethodActive(_externalAuthenticationSettings) ||
-                        !processor.PluginDescriptor.Installed ||
-                        !_pluginFinder.AuthenticateStore(processor.PluginDescriptor, _storeContext.CurrentStore.Id))
-                        throw new NopException("Facebook module cannot be loaded");
-
-                    var parameters = new FacebookAuthenticationParameters(Provider.SystemName)
+                case OpenAuthenticationStatus.AutoRegisteredEmailValidation:
                     {
-
-                        ExternalIdentifier = responseObj2["id"].ToString(),
-                        OAuthToken = accesssToken,
-                        OAuthAccessToken = responseObj2["id"].ToString(),
-                        
-                    };
-                    //add to claim of parameter
-                    var claims = new UserClaims
-                    {
-                        Contact = new ContactClaims()
-                        {
-                            Email = email
-                        }
-                    };
-                    parameters.AddClaim(claims);
-
-
-                    var result = _authorizer.Authorize(parameters);
-                    //if (result.Status == OpenAuthenticationStatus.AutoRegisteredStandard)
-                    //{
-                    //    //cheat here
-                    //    result = new AuthorizationResult(OpenAuthenticationStatus.Authenticated);
-                    //}
-                    var res= new AuthorizeState(returnUrl, result);
-                    switch (res.AuthenticationStatus)
-                    {
-                        case OpenAuthenticationStatus.Error:
-                            {
-                                if (!result.Success)
-                                    foreach (var error in result.Errors)
-                                        ExternalAuthorizerHelper.AddErrorsToDisplay(error);
-
-                                return new RedirectResult(Url.LogOn(returnUrl));
-                            }
-                        case OpenAuthenticationStatus.AssociateOnLogon:
-                            {
-                                return new RedirectResult(Url.LogOn(returnUrl));
-                            }
-                        case OpenAuthenticationStatus.AutoRegisteredEmailValidation:
-                            {
-                                //result
-                                return RedirectToRoute("RegisterResult", new { resultId = (int)UserRegistrationType.EmailValidation });
-                            }
-                        case OpenAuthenticationStatus.AutoRegisteredAdminApproval:
-                            {
-                                return RedirectToRoute("RegisterResult", new { resultId = (int)UserRegistrationType.AdminApproval });
-                            }
-                        case OpenAuthenticationStatus.AutoRegisteredStandard:
-                            {
-                                return RedirectToRoute("RegisterResult", new { resultId = (int)UserRegistrationType.Standard });
-                            }
-                        default:
-                            break;
+                        //result
+                        return RedirectToRoute("RegisterResult", new { resultId = (int)UserRegistrationType.EmailValidation });
                     }
-                    if (res.Result != null)
-                        return res.Result;
-                }
+                case OpenAuthenticationStatus.AutoRegisteredAdminApproval:
+                    {
+                        return RedirectToRoute("RegisterResult", new { resultId = (int)UserRegistrationType.AdminApproval });
+                    }
+                case OpenAuthenticationStatus.AutoRegisteredStandard:
+                    {
+                        return RedirectToRoute("RegisterResult", new { resultId = (int)UserRegistrationType.Standard });
+                    }
+                default:
+                    break;
             }
-            catch (Exception ex)
-            {
-                Trace.TraceError("error:" + ex.InnerException);
-               
-            }
-            var isAuthenticated = HttpContext.Request.IsAuthenticated;
+            if (result.Result != null)
+                return result.Result;
 
-           
-            // var returnUrl = HttpContext.Request.QueryString["returnUrl"];
+            
             return HttpContext.Request.IsAuthenticated 
                 ? new RedirectResult(!string.IsNullOrEmpty(returnUrl) ? returnUrl : "~/") 
                 : new RedirectResult(Url.LogOn(returnUrl));
-
-            //return View("~/Plugins/ExternalAuthAccountKit.Facebook/Views/ExternalAuthFacebookAccountKit/PublicInfo.cshtml");
-
-
         }
 
     }

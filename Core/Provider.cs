@@ -15,5 +15,10 @@ namespace Nop.Plugin.ExternalAuth.FacebookAccountKit.Core
                 return "ExternalAuth.FacebookAccountKit";
             }
         }
+
+        public static string Version
+        {
+            get { return "v1.0"; }
+        }
     }
 }

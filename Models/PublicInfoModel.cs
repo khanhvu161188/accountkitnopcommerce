@@ -16,5 +16,16 @@ namespace Nop.Plugin.ExternalAuth.FacebookAccountKit.Models
         [Required]
         public string csrf_nonce { get; set; }
     }
+
+    public class DisplayLoginModel : BaseNopModel
+    {
+        public bool ShowPhoneNumber { get; set; }
+
+        public string CsrfCode { get; set; }
+
+        public long AppId { get; set; }
+
+        public string Version { get; set; }
+    }
     
 }

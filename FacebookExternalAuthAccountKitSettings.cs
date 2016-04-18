@@ -6,5 +6,7 @@ namespace Nop.Plugin.ExternalAuth.FacebookAccountKit
     {
         public long FacebookAppId { get; set; }
         
+        public string AccountKitSecretToken { get; set; }
+
     }
 }

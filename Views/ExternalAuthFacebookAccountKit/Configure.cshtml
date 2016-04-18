@@ -1,31 +1,93 @@
 ﻿@{
     Layout = "";
 }
-@model Nop.Plugin.ExternalAuth.Facebook.Models.ConfigurationModel
+@model Nop.Plugin.ExternalAuth.FacebookAccountKit.Models.ConfigurationModel
 @using Nop.Web.Framework;
 @Html.Action("StoreScopeConfiguration", "Setting", new { area = "Admin" })
+
+<table>
+    <tbody>
+    <tr>
+        <td colspan="2">
+            <b>
+                Follow these steps for integrating Facebook Account Kit with your store.
+            </b>
+            <br>
+
+            <br>
+            1. Log in to your Facebook developer account.
+            <br>
+            2. Create Facebook App type <b>Website</b>
+            <br>
+            3. Go to <b>Dashboard</b> for getting <b>App ID</b> e.g 1757587394470431
+            <br>
+            4. Go to <b>Account Kit</b> and get <b>Account Kit App Secret</b> e.g a3200c038f7a2f3abcf9138fd6ee0a9e
+            <br>
+            5. Switch <b>Require App Secret </b> to <b>NO</b>
+            <br>
+            6. Under <b>Web Login Settings</b>, add your website URL(e.g http://demo.nois.club) to <b>Server URLs</b>.
+            <br>
+            7. Configure <b>Country Codes Whitelist</b> or <b>Country Codes Blacklist</b> if you want.
+            <br>
+            8. Click <b>Save Changes</b>
+            <br>
+            <br>
+            <br>
+            <br>
+        </td>
+    </tr>
+        <tr>
+            <td colspan="2">
+                <hr>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <b>
+                    In case you want to use Phone Number, please make sure that these settings is configured correct.
+                </b>
+              
+                <br>
+                1. Setting => Customer Settings => 'Usernames' enabled : <b>True</b>
+                <br>
+                2. Setting => Customer Settings => Registration Method is not <b>Email Validation</b>
+                <br>
+                <br>
+                <br>
+                <br>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <hr>
+            </td>
+        </tr>
+    </tbody>
+    
+</table>
+
 @using (Html.BeginForm())
 {
     @Html.AntiForgeryToken()
     <table class="adminContent">
         <tr>
             <td class="adminTitle">
-                @Html.OverrideStoreCheckboxFor(model => model.ClientKeyIdentifier_OverrideForStore, model => model.ClientKeyIdentifier, Model.ActiveStoreScopeConfiguration)
-                @Html.NopLabelFor(model => model.ClientKeyIdentifier):
+                @Html.OverrideStoreCheckboxFor(model => model.AppId_OverrideForStore, model => model.AppId_OverrideForStore, Model.ActiveStoreScopeConfiguration)
+                @Html.NopLabelFor(model => model.AppId):
             </td>
             <td class="adminData">
-                @Html.EditorFor(model => model.ClientKeyIdentifier)
-                @Html.ValidationMessageFor(model => model.ClientKeyIdentifier)
+                @Html.EditorFor(model => model.AppId)
+                @Html.ValidationMessageFor(model => model.AppId)
             </td>
         </tr>
         <tr>
             <td class="adminTitle">
-                @Html.OverrideStoreCheckboxFor(model => model.ClientSecret_OverrideForStore, model => model.ClientSecret, Model.ActiveStoreScopeConfiguration)
-                @Html.NopLabelFor(model => model.ClientSecret):
+                @Html.OverrideStoreCheckboxFor(model => model.AccountKitSecretToken_OverrideForStore, model => model.AccountKitSecretToken_OverrideForStore, Model.ActiveStoreScopeConfiguration)
+                @Html.NopLabelFor(model => model.AccountKitSecretToken):
             </td>
             <td class="adminData">
-                @Html.EditorFor(model => model.ClientSecret)
-                @Html.ValidationMessageFor(model => model.ClientSecret)
+                @Html.EditorFor(model => model.AccountKitSecretToken)
+                @Html.ValidationMessageFor(model => model.AccountKitSecretToken)
             </td>
         </tr>
         <tr>

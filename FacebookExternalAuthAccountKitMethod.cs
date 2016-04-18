@@ -2,6 +2,7 @@
 using Nop.Core.Plugins;
 using Nop.Services.Authentication.External;
 using Nop.Services.Configuration;
+using Nop.Services.Localization;
 
 namespace Nop.Plugin.ExternalAuth.FacebookAccountKit
 {
@@ -77,13 +78,13 @@ namespace Nop.Plugin.ExternalAuth.FacebookAccountKit
             _settingService.SaveSetting(settings);
 
             //locales
-            //this.AddOrUpdatePluginLocaleResource("Plugins.ExternalAuth.Facebook.Login", "Login using Facebook account");
-            //this.AddOrUpdatePluginLocaleResource("Plugins.ExternalAuth.Facebook.ClientKeyIdentifier", "App ID/API Key");
-            //this.AddOrUpdatePluginLocaleResource("Plugins.ExternalAuth.Facebook.ClientKeyIdentifier.Hint",
-            //    "Enter your app ID/API key here. You can find it on your FaceBook application page.");
-            //this.AddOrUpdatePluginLocaleResource("Plugins.ExternalAuth.Facebook.ClientSecret", "App Secret");
-            //this.AddOrUpdatePluginLocaleResource("Plugins.ExternalAuth.Facebook.ClientSecret.Hint",
-            //    "Enter your app secret here. You can find it on your FaceBook application page.");
+            this.AddOrUpdatePluginLocaleResource("Plugins.ExternalAuth.FacebookAccountKit.Login", "Login with Facebook Account Kit");
+            this.AddOrUpdatePluginLocaleResource("Plugins.ExternalAuth.FacebookAccountKit.AppId", "App ID/API Key");
+            this.AddOrUpdatePluginLocaleResource("Plugins.ExternalAuth.FacebookAccountKit.AppId.Hint",
+                "Enter your app ID/API key here. You can find it on your FaceBook application page.");
+            this.AddOrUpdatePluginLocaleResource("Plugins.ExternalAuth.FacebookAccountKit.ClientSecret", "Account Kit App Secret");
+            this.AddOrUpdatePluginLocaleResource("Plugins.ExternalAuth.FacebookAccountKit.ClientSecret.Hint",
+                "Enter your Account Kit App Secret here. You can find it on your FaceBook application page.");
 
             base.Install();
         }
@@ -94,11 +95,11 @@ namespace Nop.Plugin.ExternalAuth.FacebookAccountKit
             _settingService.DeleteSetting<FacebookExternalAuthAccountKitSettings>();
 
             //locales
-            //this.DeletePluginLocaleResource("Plugins.ExternalAuth.Facebook.Login");
-            //this.DeletePluginLocaleResource("Plugins.ExternalAuth.Facebook.ClientKeyIdentifier");
-            //this.DeletePluginLocaleResource("Plugins.ExternalAuth.Facebook.ClientKeyIdentifier.Hint");
-            //this.DeletePluginLocaleResource("Plugins.ExternalAuth.Facebook.ClientSecret");
-            //this.DeletePluginLocaleResource("Plugins.ExternalAuth.Facebook.ClientSecret.Hint");
+            this.DeletePluginLocaleResource("Plugins.ExternalAuth.FacebookAccountKit.Login");
+            this.DeletePluginLocaleResource("Plugins.ExternalAuth.FacebookAccountKit.ClientKeyIdentifier");
+            this.DeletePluginLocaleResource("Plugins.ExternalAuth.FacebookAccountKit.ClientKeyIdentifier.Hint");
+            this.DeletePluginLocaleResource("Plugins.ExternalAuth.FacebookAccountKit.ClientSecret");
+            this.DeletePluginLocaleResource("Plugins.ExternalAuth.FacebookAccountKit.ClientSecret.Hint");
 
             base.Uninstall();
         }

@@ -2,6 +2,7 @@ using Autofac;
 using Nop.Core.Configuration;
 using Nop.Core.Infrastructure;
 using Nop.Core.Infrastructure.DependencyManagement;
+using Nop.Plugin.ExternalAuth.FacebookAccountKit.Core;
 
 namespace Nop.Plugin.ExternalAuth.FacebookAccountKit
 {
@@ -18,7 +19,7 @@ namespace Nop.Plugin.ExternalAuth.FacebookAccountKit
         /// <param name="config">Config</param>
         public virtual void Register(ContainerBuilder builder, ITypeFinder typeFinder, NopConfig config)
         {
-            //builder.RegisterType<FacebookProviderAuthorizer>().As<IOAuthProviderFacebookAuthorizer>().InstancePerLifetimeScope();
+            builder.RegisterType<FacebookAccountKitProvicerAuthorizer>().InstancePerLifetimeScope();
         }
 
         /// <summary>

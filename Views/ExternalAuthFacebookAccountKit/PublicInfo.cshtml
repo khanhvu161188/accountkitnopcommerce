@@ -1,60 +1,59 @@
-﻿@using Nop.Web.Framework.UI
+﻿@model Nop.Plugin.ExternalAuth.FacebookAccountKit.Models.DisplayLoginModel
+@using Nop.Web.Framework.UI
 @{
     Layout = "";
     var url = this.Context.Request.QueryString["returnUrl"];
-    var m =10;
 }
 
 <div class="facebook-accountkit-login-block">
-    <div class="inputs">
-        <label for="country_code">Enter country code (e.g. +1):</label>
-        <input id="country_code" name="country_code" type="text" value="">
-      
-    </div>
-    <div class="inputs">
-       
-        <label for="phone_num">Enter phone number without spaces (e.g. 444555666):</label>
-        <input id="phone_num" name="phone_num" type="text" value="">
-    </div>
-    <input type="button" class="button-1" onclick="phone_btn_onclick();" value="Login via SMS" />
 
+    <div class="title">
+        <strong>@T("Plugins.ExternalAuth.FacebookAccountKit.Login")</strong>
+    </div>
+   
+    @if (Model.ShowPhoneNumber)
+    {
+        <div class="inputs">
+            <label for="country_code">Country code:</label>
+            <input id="country_code" name="country_code" type="text" value="" placeholder="(e.g. +1)">
+
+        </div>
+        <div class="inputs">
+            <label for="phone_num">Phone number</label>
+            <input id="phone_num" name="phone_num" type="text" value="" placeholder="without space (e.g. 444555666)">
+        </div>
+        <input type="button" class="button-1" onclick="phone_btn_onclick();" value="Login via SMS"/>
+    }
     <div class="inputs" style="padding-top: 50px;">
         <label for="email">Enter email address:</label>
         <input autofocus="autofocus" class="email" data-val="true"
                data-val-email="Wrong email"
-               data-val-required="Please enter your email" 
+               data-val-required="Please enter your email"
                id="email" name="email" type="text" value="">
         <span class="field-validation-valid" data-valmsg-for="Email" data-valmsg-replace="true"></span>
     </div>
 
     <input type="button" class="button-1" onclick="email_btn_onclick();" value="Login via Email"/>
-   @using (Html.BeginForm("PublicInfo", "ExternalAuthFacebookAccountKit",new {returnUrl= url }, FormMethod.Post,new { id = "account_kit_form" })){
-       <input type = "hidden" value = "" id = "csrf_nonce"  name = "csrf_nonce" />
-       <input type = "hidden" value = "" id = "Code" name="Code" />
-                }
-    @*<form id="account_kit_form" action="">
-       
-    </form>*@
+    @using (Html.BeginForm("PublicInfo", "ExternalAuthFacebookAccountKit", new {returnUrl = url}, FormMethod.Post, new {id = "account_kit_form"}))
+    {
+        <input type="hidden" value="" id="csrf_nonce" name="csrf_nonce"/>
+        <input type="hidden" value="" id="Code" name="Code"/>
+    }
+    <div id="errorPanel" class="message-error">
+        
+    </div>
 </div>
-<script src="https://sdk.accountkit.com/en_US/sdk.js"></script>
+<script src="https://sdk.accountkit.com/en_US/sdk.js?v=1"></script>
 
 <script>
-    @functions{
-        public string TokenHeaderValue()
-        {
-            string cookieToken, formToken;
-            AntiForgery.GetTokens(null, out cookieToken, out formToken);
-            return cookieToken + ":" + formToken;
-        }
-    }
-
+   
     // initialize Account Kit with CSRF protection
     AccountKit_OnInteractive = function(){
         AccountKit.init(
             {
-                appId: 1690029441247631,
-                state: '@TokenHeaderValue()',
-                version:"v1.0"
+                appId: @Model.AppId,
+                state: '@Model.CsrfCode',
+                version: '@Model.Version'
             }
         );
     };
@@ -69,9 +68,11 @@
         }
         else if (response.status === "NOT_AUTHENTICATED") {
             // handle authentication failure
+            $("#errorPanel").html("You are not authenticated with Facebook Account Kit");
         }
         else if (response.status === "BAD_PARAMS") {
             // handle bad parameters
+            $("#errorPanel").html("Bad parameter when using Facebook Account Kit");
         }
     }
 
