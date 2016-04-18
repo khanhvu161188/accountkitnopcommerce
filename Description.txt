@@ -1,7 +1,7 @@
 ﻿Group: ExternalAuth methods
 FriendlyName: Facebook Account Kit
 SystemName: ExternalAuth.FacebookAccountKit
-Version: 1.0
+Version: 1.1
 SupportedVersions: 3.70
 Author: khanh.vu1611@outlook.com
 DisplayOrder: 5
